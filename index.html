@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔌 Monitor Energético</title>
+  <script src="chart.js"></script>
+  <link rel="stylesheet" href="estilos.css">
+  
+</head>
+
+<body>
+
+  <h1>🔌 Monitor Energético en Tiempo Real</h1>
+
+  <div class="tarjeta">
+    <div class="valor" id="corriente">-- A</div>
+    <div class="label">Corriente</div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="valor" id="potencia">-- W</div>
+    <div class="label">Potencia</div>
+  </div>
+
+  <button onclick="conectar()">🔗 Conectar Arduino</button>
+  <p id="error"></p>
+  <div style="width: 90%; max-width: 600px; margin-top: 40px;">
+    <canvas id="grafico"></canvas>
+  </div>
+  <!-- aquiiiii -->
+  <div style="width: 100%; max-width: 600px; margin-top: 40px;">
+  <h3 style="text-align: center; margin-bottom: 10px;">📋 Registro de Medidas</h3>
+  <table id="tabla-registros" style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background-color: #1e88e5; color: white;">
+        <th style="padding: 8px;">Hora</th>
+        <th style="padding: 8px;">Corriente (A)</th>
+        <th style="padding: 8px;">Potencia (W)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Filas se agregarán aquí automáticamente -->
+    </tbody>
+  </table>
+</div>
+
+<!-- aquiiiii -->
+
+
+ <script>
+  const ipArduino = "http://192.168.79.41"; // ← la IP que te dio el Arduino
+  const maxPuntos = 30;
+  const datosTiempo = [], datosCorriente = [], datosPotencia = [];
+
+  const ctx = document.getElementById('grafico').getContext('2d');
+  const grafico = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: datosTiempo,
+      datasets: [
+        {
+          label: 'Corriente (A)',
+          data: datosCorriente,
+          borderColor: '#1e88e5',
+          backgroundColor: 'rgba(30,136,229,0.2)',
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'Potencia (W)',
+          data: datosPotencia,
+          borderColor: '#e53935',
+          backgroundColor: 'rgba(229,57,53,0.2)',
+          fill: true,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: { title: { display: true, text: 'Tiempo (s)' } },
+        y: { beginAtZero: true, title: { display: true, text: 'Medida' } }
+      }
+    }
+  });
+
+  async function leerDatosDesdeArduino() {
+    try {
+      const res = await fetch(ipArduino + "/datos");
+      const texto = await res.text(); // ejemplo: "0.13,28.5"
+      const [corriente, potencia] = texto.trim().split(",").map(Number);
+
+      if (!isNaN(corriente) && !isNaN(potencia)) {
+        // Mostrar en pantalla
+        document.getElementById("corriente").textContent = `${corriente.toFixed(2)} A`;
+        document.getElementById("potencia").textContent = `${potencia.toFixed(2)} W`;
+
+        const tiempo = new Date().toLocaleTimeString();
+        datosTiempo.push(tiempo);
+        datosCorriente.push(corriente.toFixed(2));
+        datosPotencia.push(potencia.toFixed(2));
+
+        if (datosTiempo.length > maxPuntos) {
+          datosTiempo.shift();
+          datosCorriente.shift();
+          datosPotencia.shift();
+        }
+
+        grafico.update();
+
+        const tabla = document.getElementById("tabla-registros").querySelector("tbody");
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td style="padding: 6px; text-align: center;">${tiempo}</td>
+          <td style="padding: 6px; text-align: center;">${corriente.toFixed(2)}</td>
+          <td style="padding: 6px; text-align: center;">${potencia.toFixed(2)}</td>`;
+        tabla.appendChild(fila);
+        if (tabla.rows.length > 10) tabla.deleteRow(0);
+      }
+    } catch (err) {
+      console.error("❌ Error obteniendo datos:", err);
+    }
+  }
+
+  // Llamar cada segundo
+  setInterval(leerDatosDesdeArduino, 1000);
+</script>
+
+</body>
+
+</html>
